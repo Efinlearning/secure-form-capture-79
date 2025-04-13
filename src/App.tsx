@@ -9,20 +9,20 @@ import "./App.css";
 
 function App() {
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex-1 overflow-auto">
-          <BrowserRouter>
+    <BrowserRouter>
+      <SidebarProvider>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <div className="flex-1 overflow-auto">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
+          </div>
         </div>
-      </div>
-      <Toaster />
-    </SidebarProvider>
+        <Toaster />
+      </SidebarProvider>
+    </BrowserRouter>
   );
 }
 

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { 
   Table, 
@@ -20,7 +19,9 @@ import {
   Mail, 
   Key, 
   FileText, 
-  AlertCircle 
+  AlertCircle,
+  ExternalLink,
+  Download
 } from "lucide-react";
 import { 
   Drawer,
@@ -88,6 +89,33 @@ export function CredentialsList({ credentials, onRefresh }: CredentialsListProps
     }
   };
 
+  const openUrlInNewTab = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    toast({
+      title: "Opening URL",
+      description: "Opening in a new tab",
+      duration: 3000,
+    });
+  };
+
+  const downloadCredential = (credential: Credential) => {
+    const dataStr = JSON.stringify(credential, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    
+    const exportFileDefaultName = `credential_${new Date(credential.timestamp).toISOString().slice(0,10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    
+    toast({
+      title: "Credential downloaded",
+      description: "Credential has been exported as JSON",
+      duration: 3000,
+    });
+  };
+
   if (credentials.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -138,8 +166,34 @@ export function CredentialsList({ credentials, onRefresh }: CredentialsListProps
                     </Button>
                   </DrawerTrigger>
                   <DrawerContent>
-                    <DrawerHeader>
+                    <DrawerHeader className="flex justify-between items-center pr-4">
                       <DrawerTitle>Credential Details</DrawerTitle>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => openUrlInNewTab(credential.url)}
+                          title="Open in new tab"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => copyToClipboard(JSON.stringify(credential, null, 2), "Credential JSON copied to clipboard")}
+                          title="Copy as JSON"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => downloadCredential(credential)}
+                          title="Download credential"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </DrawerHeader>
                     <div className="p-4">
                       <div className="mb-4">
