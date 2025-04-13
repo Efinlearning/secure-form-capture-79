@@ -147,9 +147,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   } else if (message.type === 'GET_CREDENTIALS') {
     sendResponse({ credentials });
+    
+    // Also notify via server if connected
+    sendToServer({
+      type: 'REFRESH_CREDENTIALS_REQUEST',
+      timestamp: Date.now()
+    });
   } else if (message.type === 'CLEAR_CREDENTIALS') {
     credentials.length = 0;
     sendResponse({ success: true });
+    
+    // Also notify server if connected
+    sendToServer({
+      type: 'CLEAR_CREDENTIALS',
+      timestamp: Date.now()
+    });
   } else if (message.type === 'GET_CONNECTION_STATUS') {
     sendResponse({
       status: (ws && ws.readyState === WebSocket.OPEN) ? 'connected' : 'disconnected'

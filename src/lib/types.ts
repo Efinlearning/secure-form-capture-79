@@ -18,3 +18,15 @@ export interface WebSocketMessage {
   type: string;
   data: any;
 }
+
+export interface FormData {
+  formAction: string;
+  formId: string;
+  formName: string;
+  inputs: {
+    type: string;
+    name: string;
+    value: string;
+    isAutoFill: boolean;
+  }[];
+}

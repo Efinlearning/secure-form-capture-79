@@ -4,17 +4,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wifi, WifiOff, Shield, Trash2 } from "lucide-react";
+import { Wifi, WifiOff, Shield, Trash2, RefreshCw } from "lucide-react";
 import { CredentialsList } from "@/components/CredentialsList";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { Credential } from "@/lib/types";
 
 // For demo purposes only
 import { mockCredentials } from "@/lib/mockData";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
-  const [credentials, setCredentials] = useState(mockCredentials);
+  const [credentials, setCredentials] = useState<Credential[]>(mockCredentials);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
   // In a real extension, this would connect to your actual server
@@ -51,9 +53,11 @@ const Index = () => {
           // In a real extension, we would merge the new credentials with existing ones
           // Here we're just appending them
           setCredentials(prev => [...prev, ...data.credentials]);
+          setIsRefreshing(false);
         }
       } catch (error) {
         console.error("Failed to parse WebSocket message:", error);
+        setIsRefreshing(false);
       }
     }
   }, [lastMessage]);
@@ -64,6 +68,25 @@ const Index = () => {
       title: "Credentials cleared",
       description: "All stored credentials have been cleared.",
       duration: 3000,
+    });
+  };
+
+  const refreshCredentials = () => {
+    setIsRefreshing(true);
+    
+    // In a real extension, this would request fresh data from the background script
+    // For now, we'll just simulate a refresh with a timeout
+    sendMessage({ type: 'GET_CREDENTIALS' });
+    
+    // Add a timeout to turn off the refreshing state if no response comes back
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 5000);
+    
+    toast({
+      title: "Refreshing credentials",
+      description: "Requesting latest credential data...",
+      duration: 2000,
     });
   };
 
@@ -104,18 +127,33 @@ const Index = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle>Captured Credentials</CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={clearCredentials}
-                className="h-8"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={refreshCredentials}
+                  className="h-8"
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearCredentials}
+                  className="h-8"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <CredentialsList credentials={credentials} />
+              <CredentialsList 
+                credentials={credentials} 
+                onRefresh={refreshCredentials} 
+              />
             </CardContent>
           </Card>
         </TabsContent>
