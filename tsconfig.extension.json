@@ -1,0 +1,11 @@
+
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "es2015",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "types": ["chrome"]
+  },
+  "include": ["src/lib/backgroundScript.ts", "src/lib/contentScript.ts", "src/lib/chrome.d.ts"],
+  "exclude": ["node_modules"]
+}
