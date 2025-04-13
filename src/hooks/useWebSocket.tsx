@@ -8,6 +8,7 @@ export const useWebSocket = (url: string) => {
   const [lastMessage, setLastMessage] = useState<MessageEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const messageQueueRef = useRef<any[]>([]);
 
   const connect = useCallback(() => {
     try {
@@ -16,6 +17,15 @@ export const useWebSocket = (url: string) => {
       ws.onopen = () => {
         console.log('WebSocket connection established');
         setConnectionStatus('connected');
+        
+        // Send any queued messages
+        while (messageQueueRef.current.length > 0) {
+          const message = messageQueueRef.current.shift();
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(typeof message === 'string' ? message : JSON.stringify(message));
+          }
+        }
+        
         // Clear any reconnection timeout
         if (reconnectTimeoutRef.current !== null) {
           clearTimeout(reconnectTimeoutRef.current);
@@ -36,6 +46,7 @@ export const useWebSocket = (url: string) => {
       ws.onclose = () => {
         console.log('WebSocket connection closed');
         setConnectionStatus('disconnected');
+        wsRef.current = null;
         
         // Attempt to reconnect after a delay
         if (reconnectTimeoutRef.current === null) {
@@ -76,13 +87,20 @@ export const useWebSocket = (url: string) => {
   }, []);
   
   const sendMessage = useCallback((data: any) => {
-    if (wsRef.current && connectionStatus === 'connected') {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const message = typeof data === 'string' ? data : JSON.stringify(data);
       wsRef.current.send(message);
       return true;
+    } else {
+      // Queue the message for later when connection is established
+      messageQueueRef.current.push(data);
+      // Try to connect if not already connected
+      if (!wsRef.current) {
+        connect();
+      }
+      return false;
     }
-    return false;
-  }, [connectionStatus]);
+  }, [connect]);
   
   useEffect(() => {
     connect();

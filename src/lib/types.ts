@@ -30,3 +30,14 @@ export interface FormData {
     isAutoFill: boolean;
   }[];
 }
+
+export interface ServerMessage {
+  type: string;
+  credentials?: Credential[];
+  credential?: Credential;
+  timestamp?: number;
+  message?: string;
+  success?: boolean;
+}
+
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
