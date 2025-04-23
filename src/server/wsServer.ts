@@ -2,7 +2,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { Server } from 'http';
-import { Credential } from '@/lib/types';
+import { Credential } from '../lib/types';
 
 export function setupWebSocketServer(server: Server) {
   const wss = new WebSocketServer({ server });

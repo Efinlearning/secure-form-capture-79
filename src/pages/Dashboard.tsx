@@ -1,13 +1,13 @@
+
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2, Download, Copy, AlertOctagon, Terminal } from "lucide-react";
+import { RefreshCw, Trash2, Download } from "lucide-react";
 import { CredentialsList } from "@/components/CredentialsList";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 import { Credential } from "@/lib/types";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // For demo purposes only
 import { mockCredentials } from "@/lib/mockData";
