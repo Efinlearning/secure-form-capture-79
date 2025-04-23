@@ -4,10 +4,11 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { setupWebSocketServer } from "./src/server/wsServer";
-import { Plugin, ViteDevServer } from "vite";
+import { Plugin, ViteDevServer, ConfigEnv, UserConfigExport } from "vite";
+import { Server as HttpServer } from "http";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }: ConfigEnv): UserConfigExport => {
   return {
     server: {
       host: "::",
@@ -21,7 +22,7 @@ export default defineConfig(({ mode }) => {
         name: 'setup-websocket',
         configureServer(server: ViteDevServer) {
           if (server.httpServer) {
-            setupWebSocketServer(server.httpServer);
+            setupWebSocketServer(server.httpServer as HttpServer);
           }
         },
       },
