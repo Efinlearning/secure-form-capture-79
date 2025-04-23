@@ -22,10 +22,14 @@ export function setupWebSocketServer(server: Server) {
     
     // Send current credentials to the new client
     if (credentials.length > 0) {
-      ws.send(JSON.stringify({
-        type: 'credentials',
-        credentials
-      }));
+      try {
+        ws.send(JSON.stringify({
+          type: 'credentials',
+          credentials
+        }));
+      } catch (err) {
+        console.error('Error sending credentials to client:', err);
+      }
     }
     
     // Handle messages from clients
@@ -41,10 +45,14 @@ export function setupWebSocketServer(server: Server) {
           // Broadcast to all connected clients
           clients.forEach((client) => {
             if (client !== ws && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({
-                type: 'credentials',
-                credentials: [data.credential]
-              }));
+              try {
+                client.send(JSON.stringify({
+                  type: 'credentials',
+                  credentials: [data.credential]
+                }));
+              } catch (err) {
+                console.error('Error broadcasting to client:', err);
+              }
             }
           });
         }
@@ -53,11 +61,21 @@ export function setupWebSocketServer(server: Server) {
       }
     });
     
+    // Handle errors
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+    
     // Handle client disconnection
     ws.on('close', () => {
       console.log('Client disconnected');
       clients.delete(ws);
     });
+  });
+
+  // Handle server errors
+  wss.on('error', (error) => {
+    console.error('WebSocket server error:', error);
   });
 
   return wss;

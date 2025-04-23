@@ -19,8 +19,8 @@ const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // In a real extension, this would connect to your actual server
-  const serverUrl = "ws://localhost:3000";
+  // Use the same port as in vite.config.ts
+  const serverUrl = "ws://localhost:8080";
   
   // Initialize WebSocket connection
   const { sendMessage, lastMessage, connectionStatus } = useWebSocket(serverUrl);

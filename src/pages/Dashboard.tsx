@@ -18,6 +18,7 @@ const Dashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
+  // Use the same port as in vite.config.ts
   const serverUrl = "ws://localhost:8080";
   
   const { sendMessage, lastMessage, connectionStatus } = useWebSocket(serverUrl);

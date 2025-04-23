@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -34,8 +33,12 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
         // Send any queued messages
         while (messageQueueRef.current.length > 0) {
           const message = messageQueueRef.current.shift();
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(typeof message === 'string' ? message : JSON.stringify(message));
+          if (message && ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(typeof message === 'string' ? message : JSON.stringify(message));
+            } catch (err) {
+              console.error('Error sending queued message:', err);
+            }
           }
         }
         
@@ -47,8 +50,12 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
       };
       
       ws.onmessage = (event) => {
-        console.log('Message received:', event.data);
-        setLastMessage(event);
+        try {
+          console.log('Message received:', event.data);
+          setLastMessage(event);
+        } catch (err) {
+          console.error('Error processing received message:', err);
+        }
       };
       
       ws.onerror = (error) => {
@@ -57,8 +64,8 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
         // We'll handle the reconnection in onclose
       };
       
-      ws.onclose = () => {
-        console.log('WebSocket connection closed');
+      ws.onclose = (event) => {
+        console.log('WebSocket connection closed. Code:', event.code, 'Reason:', event.reason);
         setConnectionStatus('disconnected');
         wsRef.current = null;
         
@@ -103,7 +110,11 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
   
   const disconnect = useCallback(() => {
     if (wsRef.current) {
-      wsRef.current.close();
+      try {
+        wsRef.current.close();
+      } catch (err) {
+        console.error('Error closing WebSocket:', err);
+      }
       wsRef.current = null;
     }
     
@@ -133,9 +144,21 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
     connect();
     
     return () => {
-      disconnect();
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch (err) {
+          console.error('Error closing WebSocket:', err);
+        }
+        wsRef.current = null;
+      }
+      
+      if (reconnectTimeoutRef.current !== null) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
-  }, [connect, disconnect]);
+  }, [connect]);
   
   return {
     connectionStatus,
