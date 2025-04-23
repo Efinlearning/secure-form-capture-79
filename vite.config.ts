@@ -4,11 +4,11 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { setupWebSocketServer } from "./src/server/wsServer";
-import { Plugin, ViteDevServer, ConfigEnv, UserConfigExport } from "vite";
+import { Plugin, ViteDevServer } from "vite";
 import { Server as HttpServer } from "http";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }: ConfigEnv): UserConfigExport => {
+export default defineConfig(({ mode }) => {
   return {
     server: {
       host: "::",

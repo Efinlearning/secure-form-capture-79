@@ -4,7 +4,12 @@ import { IncomingMessage, Server } from 'http';
 import { Credential } from '../lib/types';
 
 export function setupWebSocketServer(server: Server) {
-  const wss = new WebSocketServer({ server });
+  const wss = new WebSocketServer({ 
+    server,
+    // Add these options for better error handling
+    perMessageDeflate: false,
+    maxPayload: 2 * 1024 * 1024, // 2MB max message size
+  });
 
   console.log('WebSocket server integrated with Vite server');
 
@@ -34,7 +39,14 @@ export function setupWebSocketServer(server: Server) {
     // Handle messages from clients
     ws.on('message', (message: WebSocket.Data) => {
       try {
-        const data = JSON.parse(message.toString());
+        const messageStr = message.toString();
+        // Check if the message is valid JSON
+        if (!messageStr.trim().startsWith('{') && !messageStr.trim().startsWith('[')) {
+          console.warn('Received non-JSON message, ignoring');
+          return;
+        }
+        
+        const data = JSON.parse(messageStr);
         console.log('Received:', data);
         
         // Handle new credential
@@ -60,14 +72,14 @@ export function setupWebSocketServer(server: Server) {
       }
     });
     
-    // Handle errors
+    // Handle errors with better logging
     ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
+      console.error('WebSocket connection error:', error);
     });
     
     // Handle client disconnection
-    ws.on('close', () => {
-      console.log('Client disconnected');
+    ws.on('close', (code, reason) => {
+      console.log(`Client disconnected. Code: ${code}, Reason: ${reason || 'No reason provided'}`);
       clients.delete(ws);
     });
   });
@@ -75,6 +87,20 @@ export function setupWebSocketServer(server: Server) {
   // Handle server errors
   wss.on('error', (error) => {
     console.error('WebSocket server error:', error);
+  });
+
+  // Heartbeat to prevent timeouts
+  const interval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+      }
+    });
+  }, 30000);
+
+  // Clean up on server close
+  wss.on('close', () => {
+    clearInterval(interval);
   });
 
   return wss;

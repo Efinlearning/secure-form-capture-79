@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -22,6 +23,16 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
         return;
       }
       
+      // Close existing connection if any
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch (err) {
+          console.error('Error closing existing WebSocket connection:', err);
+        }
+      }
+      
+      console.log(`Attempting to connect to WebSocket at ${url}`);
       const ws = new WebSocket(url);
       
       ws.onopen = () => {
@@ -58,8 +69,8 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
         }
       };
       
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      ws.onerror = (errorEvent) => {
+        console.error('WebSocket error:', errorEvent);
         setError(new Error('Connection error'));
         // We'll handle the reconnection in onclose
       };
@@ -126,9 +137,15 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
   
   const sendMessage = useCallback((data: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      const message = typeof data === 'string' ? data : JSON.stringify(data);
-      wsRef.current.send(message);
-      return true;
+      try {
+        const message = typeof data === 'string' ? data : JSON.stringify(data);
+        wsRef.current.send(message);
+        return true;
+      } catch (err) {
+        console.error('Error sending WebSocket message:', err);
+        messageQueueRef.current.push(data);
+        return false;
+      }
     } else {
       // Queue the message for later when connection is established
       messageQueueRef.current.push(data);
