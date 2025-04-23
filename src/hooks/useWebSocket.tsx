@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -23,7 +22,7 @@ export const useWebSocket = (url: string, autoReconnect = true) => {
         return;
       }
       
-      const ws = new WebSocket(url);
+      const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
         console.log('WebSocket connection established');
