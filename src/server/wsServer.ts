@@ -1,19 +1,22 @@
 
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
+import { IncomingMessage } from 'http';
+import { Server } from 'http';
+import { Credential } from '@/lib/types';
 
-export function setupWebSocketServer(server: any) {
+export function setupWebSocketServer(server: Server) {
   const wss = new WebSocketServer({ server });
 
   console.log('WebSocket server integrated with Vite server');
 
   // Store connected clients
-  const clients = new Set();
+  const clients = new Set<WebSocket>();
 
   // Store credentials
-  const credentials = [];
+  const credentials: Credential[] = [];
 
   // Handle WebSocket connections
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws: WebSocket, request: IncomingMessage) => {
     console.log('Client connected');
     clients.add(ws);
     
@@ -26,7 +29,7 @@ export function setupWebSocketServer(server: any) {
     }
     
     // Handle messages from clients
-    ws.on('message', (message) => {
+    ws.on('message', (message: WebSocket.Data) => {
       try {
         const data = JSON.parse(message.toString());
         console.log('Received:', data);
@@ -37,7 +40,7 @@ export function setupWebSocketServer(server: any) {
           
           // Broadcast to all connected clients
           clients.forEach((client) => {
-            if (client !== ws && client.readyState === WebSocketServer.OPEN) {
+            if (client !== ws && client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 type: 'credentials',
                 credentials: [data.credential]

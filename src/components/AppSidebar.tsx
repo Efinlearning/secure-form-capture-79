@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AppSidebar() {
   const [isConnected, setIsConnected] = useState(false);
-  const serverUrl = "ws://localhost:3000";
+  const serverUrl = "ws://localhost:8080";
   const { connectionStatus } = useWebSocket(serverUrl, false); // Don't auto reconnect in sidebar
 
   useEffect(() => {
