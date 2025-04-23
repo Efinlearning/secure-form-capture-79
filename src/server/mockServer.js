@@ -2,10 +2,10 @@
 // This is a simple mock server for testing WebSocket communication
 // In a real application, you would have a proper Node.js server
 
-const WebSocket = require('ws');
+import { WebSocketServer } from 'ws';
 
 // Create a WebSocket server
-const wss = new WebSocket.Server({ port: 3000 });
+const wss = new WebSocketServer({ port: 3000 });
 
 console.log('WebSocket server started on port 3000');
 
@@ -40,7 +40,7 @@ wss.on('connection', (ws) => {
         
         // Broadcast to all connected clients
         clients.forEach((client) => {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
+          if (client !== ws && client.readyState === WebSocketServer.OPEN) {
             client.send(JSON.stringify({
               type: 'credentials',
               credentials: [data.credential]

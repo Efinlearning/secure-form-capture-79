@@ -16,6 +16,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function AppSidebar() {
   const [isConnected, setIsConnected] = useState(false);
@@ -69,6 +70,17 @@ export function AppSidebar() {
                   )}
                 </div>
                 
+                <Alert variant="warning" className="mb-2">
+                  <AlertDescription className="text-xs">
+                    <p className="mb-1">To start the server, run:</p>
+                    <div className="bg-muted p-1 rounded flex items-center">
+                      <Terminal className="h-3 w-3 mr-1" />
+                      <code className="text-xs break-all">node --experimental-modules src/server/mockServer.js</code>
+                    </div>
+                    <p className="mt-1 text-xs">Demo data is used when server is offline.</p>
+                  </AlertDescription>
+                </Alert>
+                
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -78,11 +90,7 @@ export function AppSidebar() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="text-xs">
-                        To start the server, run: <br />
-                        <code className="bg-muted p-1 rounded flex items-center mt-1">
-                          <Terminal className="h-3 w-3 mr-1" />
-                          node src/server/mockServer.js
-                        </code>
+                        WebSocket server URL
                       </p>
                     </TooltipContent>
                   </Tooltip>
