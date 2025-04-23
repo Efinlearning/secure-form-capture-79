@@ -1,13 +1,14 @@
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Trash2, Download, Copy } from "lucide-react";
+import { RefreshCw, Trash2, Download, Copy, AlertOctagon, Terminal } from "lucide-react";
 import { CredentialsList } from "@/components/CredentialsList";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 import { Credential } from "@/lib/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // For demo purposes only
 import { mockCredentials } from "@/lib/mockData";
@@ -16,32 +17,32 @@ const Dashboard = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [credentials, setCredentials] = useState<Credential[]>(mockCredentials);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [useFallbackData, setUseFallbackData] = useState(false);
   const { toast } = useToast();
 
   // In a real extension, this would connect to your actual server
   const serverUrl = "ws://localhost:3000";
   
   // Initialize WebSocket connection
-  const { sendMessage, lastMessage, connectionStatus } = useWebSocket(serverUrl);
+  const { sendMessage, lastMessage, connectionStatus, error } = useWebSocket(serverUrl);
 
   useEffect(() => {
-    setIsConnected(connectionStatus === 'connected');
+    const connected = connectionStatus === 'connected';
+    setIsConnected(connected);
     
-    if (connectionStatus === 'connected') {
+    // After some connection attempts, if still not connected, use fallback data
+    if (connectionStatus === 'disconnected' && error) {
+      setUseFallbackData(true);
+    }
+    
+    if (connected) {
       toast({
         title: "Connected to server",
         description: "Successfully established connection with the server.",
         duration: 3000,
       });
-    } else if (connectionStatus === 'disconnected') {
-      toast({
-        title: "Disconnected from server",
-        description: "Connection to server lost. Trying to reconnect...",
-        variant: "destructive",
-        duration: 3000,
-      });
     }
-  }, [connectionStatus, toast]);
+  }, [connectionStatus, error, toast]);
 
   useEffect(() => {
     // Handle incoming messages from the server
@@ -63,7 +64,9 @@ const Dashboard = () => {
 
   const clearCredentials = () => {
     setCredentials([]);
-    sendMessage({ type: 'CLEAR_CREDENTIALS' });
+    if (isConnected) {
+      sendMessage({ type: 'CLEAR_CREDENTIALS' });
+    }
     toast({
       title: "Credentials cleared",
       description: "All stored credentials have been cleared.",
@@ -73,12 +76,14 @@ const Dashboard = () => {
 
   const refreshCredentials = () => {
     setIsRefreshing(true);
-    sendMessage({ type: 'GET_CREDENTIALS' });
-    
-    // Add a timeout to turn off the refreshing state if no response comes back
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 5000);
+    if (isConnected) {
+      sendMessage({ type: 'GET_CREDENTIALS' });
+    } else {
+      // If not connected, just simulate a refresh with mock data
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 1000);
+    }
     
     toast({
       title: "Refreshing credentials",
@@ -109,7 +114,14 @@ const Dashboard = () => {
     <div className="p-6">
       <Card className="w-full">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-xl">Captured Credentials</CardTitle>
+          <div>
+            <CardTitle className="text-xl">Captured Credentials</CardTitle>
+            {useFallbackData && (
+              <CardDescription className="text-amber-500">
+                Using demo data (WebSocket server not available)
+              </CardDescription>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button 
               variant="outline" 
@@ -142,6 +154,21 @@ const Dashboard = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {useFallbackData && (
+            <Alert variant="warning" className="mb-4">
+              <AlertOctagon className="h-4 w-4" />
+              <AlertTitle>WebSocket Server Not Available</AlertTitle>
+              <AlertDescription>
+                <p className="mb-2">The WebSocket server is not running. To start it, open a terminal and run:</p>
+                <div className="bg-muted p-2 rounded-md flex items-center mb-2">
+                  <Terminal className="h-4 w-4 mr-2" />
+                  <code>node src/server/mockServer.js</code>
+                </div>
+                <p>Meanwhile, the application is using demo data.</p>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="mb-4 flex items-center">
             <Badge variant={isConnected ? "outline" : "destructive"} className="mr-2">
               {isConnected ? "Connected" : "Disconnected"}

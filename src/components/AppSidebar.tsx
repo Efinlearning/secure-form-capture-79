@@ -1,5 +1,5 @@
 
-import { Shield, Settings, Database, Wifi, WifiOff } from "lucide-react";
+import { Shield, Settings, Database, Wifi, WifiOff, Terminal } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,11 +15,12 @@ import {
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function AppSidebar() {
   const [isConnected, setIsConnected] = useState(false);
   const serverUrl = "ws://localhost:3000";
-  const { connectionStatus } = useWebSocket(serverUrl);
+  const { connectionStatus } = useWebSocket(serverUrl, false); // Don't auto reconnect in sidebar
 
   useEffect(() => {
     setIsConnected(connectionStatus === 'connected');
@@ -67,9 +68,25 @@ export function AppSidebar() {
                     </>
                   )}
                 </div>
-                <div className="bg-secondary text-secondary-foreground px-3 py-1 rounded text-xs mb-2">
-                  {serverUrl}
-                </div>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-secondary text-secondary-foreground px-3 py-1 rounded text-xs mb-2 flex items-center">
+                        <span className="truncate">{serverUrl}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        To start the server, run: <br />
+                        <code className="bg-muted p-1 rounded flex items-center mt-1">
+                          <Terminal className="h-3 w-3 mr-1" />
+                          node src/server/mockServer.js
+                        </code>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               
               <div className="mb-4">
